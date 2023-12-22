@@ -330,37 +330,31 @@ public class RetakesPlugin : BasePlugin
                 Grenades.Allocate(player);
             });
         }
-        
-        // TODO: Add auto plant logic here.
 
         return HookResult.Continue;
     }
     
     [GameEventHandler]
-    public HookResult OnBombBeginPlant(EventBombBeginplant @event, GameEventInfo info)
+    public HookResult OnRoundFreezeEnd(EventRoundFreezeEnd @event, GameEventInfo info) 
     {
-        Console.WriteLine($"{MessagePrefix}BombBeginplant event fired.");
+        Console.WriteLine($"{MessagePrefix}OnFreezeTimeEnd event fired.");
+        var pBombCarrierController = Helpers.GetBombCarrier();
 
-        var player = @event.Userid;
-        
-        if (!Helpers.IsValidPlayer(player))
+        if (pBombCarrierController == null)
         {
+            Console.WriteLine($"{MessagePrefix}Bomb carrier not found.");
             return HookResult.Continue;
         }
-        
-        _gameRules = Helpers.GetGameRules();
-        
-        // Don't allow planting during freeze time.
-        if (_gameRules!.FreezePeriod)
+
+        if (!pBombCarrierController.PlayerPawn.Value!.InBombZone)
         {
-            Console.WriteLine($"{MessagePrefix}Should be preventing plant for userid({(int)player.UserId!}).");
-            player.PrintToChat($"{MessagePrefix}You cannot plant during freeze time.");
-            
-            // TODO: Investigate this because sometimes it doesn't work.
-            // Change to their knife to prevent planting.
-            NativeAPI.IssueClientCommand((int)player.UserId!, "slot3");
+            Console.WriteLine($"{MessagePrefix}Bomb carrier not in bomb zone.");
+            return HookResult.Continue;
         }
-        
+
+        Console.WriteLine($"{MessagePrefix}Planting c4...");
+        CreatePlantedC4(pBombCarrierController);
+
         return HookResult.Continue;
     }
     
@@ -469,6 +463,17 @@ public class RetakesPlugin : BasePlugin
     public HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
     {
         Console.WriteLine($"{MessagePrefix}OnRoundEnd event fired.");
+        
+        // If we don't have the game rules, get them.
+        var gameRules = Helpers.GetGameRules();
+        
+        if (gameRules == null)
+        {
+            Console.WriteLine($"{MessagePrefix}Game rules not found.");
+            return HookResult.Continue;
+        }
+        
+        gameRules.BombPlanted = false;
 
         _didTerroristsWinLastRound = @event.Winner == (int)CsTeam.Terrorist;
 
@@ -497,5 +502,93 @@ public class RetakesPlugin : BasePlugin
         _gameManager.Queue.DebugQueues(false);
 
         return HookResult.Continue;
+    }
+
+    // Autoplant helpers (credit zwolof)
+    private bool CreatePlantedC4(CCSPlayerController bombCarrier)
+    {
+        Console.WriteLine($"{MessagePrefix}1");
+        var gameRules = Helpers.GetGameRules();
+        Console.WriteLine($"{MessagePrefix}2");
+
+        if (gameRules == null || !Helpers.IsValidPlayer(bombCarrier))
+        {
+            Console.WriteLine($"{MessagePrefix}return false 1");
+            return false;
+        }
+        
+        var prop = Utilities.CreateEntityByName<CBaseModelEntity>("planted_c4");
+
+        if (prop == null) 
+        {
+            Console.WriteLine($"{MessagePrefix}return false 2");
+            return false;
+        }
+
+        var playerOrigin = bombCarrier.PlayerPawn.Value!.AbsOrigin;
+
+        if (playerOrigin == null)
+        {
+            Console.WriteLine($"{MessagePrefix}return false 3");
+            return false;
+        }
+        
+        playerOrigin.Z -= bombCarrier.PlayerPawn.Value.Collision.Mins.Z;
+
+        Console.WriteLine($"{MessagePrefix}spawning prop");
+        prop.DispatchSpawn();
+
+        var plantedC4 = new CPlantedC4(prop.Handle);
+
+        Server.NextFrame(() =>
+        {
+            Server.NextFrame(() => {
+                Console.WriteLine($"{MessagePrefix}teleporting prop");
+                prop.Teleport(playerOrigin, new QAngle(IntPtr.Zero, IntPtr.Zero, IntPtr.Zero), new Vector(0, 0, 0));
+
+                Console.WriteLine($"{MessagePrefix}setting planted c4 props");
+                // This works but it's not the best way to do it(questionable decision)
+                plantedC4.BombTicking = true;
+                // plantedC4.BombSite = (int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value;
+                // plantedC4.CannotBeDefused = false;
+                // plantedC4.BeingDefused = false;
+                
+                Console.WriteLine($"{MessagePrefix}getting bombtarget - {(int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value}");
+                var bombTarget = Utilities.GetEntityFromIndex<CBombTarget>((int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value);
+                Console.WriteLine($"{MessagePrefix}got bomb target, setting bombplantedhere");
+                bombTarget.BombPlantedHere = true;
+
+                Console.WriteLine($"{MessagePrefix}sending bomb planted event");
+                SendBombPlantedEvent(bombCarrier);
+                
+                // set game rules
+                Console.WriteLine($"{MessagePrefix}setting game rules");
+                gameRules.BombDropped = false;
+                gameRules.BombPlanted = true;
+                
+                Console.WriteLine($"{MessagePrefix}removing bomb");
+                Helpers.RemoveItemByDesignerName(bombCarrier, "weapon_c4");
+            });
+        });
+
+        return true;
+    }
+
+    private void SendBombPlantedEvent(CCSPlayerController bombCarrier)
+    {
+        if (bombCarrier.PlayerPawn.Value == null)
+        {
+            return;
+        }
+
+        var bombPlantedEvent = NativeAPI.CreateEvent("bomb_planted", true);
+        NativeAPI.SetEventPlayerController(bombPlantedEvent, "userid", bombCarrier.Handle);
+        NativeAPI.SetEventInt(bombPlantedEvent, "userid", (int)bombCarrier.PlayerPawn.Value.Index);
+        NativeAPI.SetEventInt(bombPlantedEvent, "posx", (int)bombCarrier.PlayerPawn.Value.AbsOrigin!.X);
+        NativeAPI.SetEventInt(bombPlantedEvent, "posy", (int)bombCarrier.PlayerPawn.Value.AbsOrigin!.Y);
+        NativeAPI.SetEventInt(bombPlantedEvent, "site", (int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value);
+        NativeAPI.SetEventInt(bombPlantedEvent, "priority", 5);
+
+        NativeAPI.FireEvent(bombPlantedEvent, false);
     }
 }

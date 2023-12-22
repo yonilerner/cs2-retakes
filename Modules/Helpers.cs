@@ -65,6 +65,31 @@ public class Helpers
         return gameRulesEntities.First().GameRules!;
     }
     
+    public static bool RemoveItemByDesignerName(CCSPlayerController player, string designerName)
+    {
+        CHandle<CBasePlayerWeapon>? item = null;
+        if (player.PlayerPawn.Value == null || player.PlayerPawn.Value.WeaponServices == null) return false;
+
+        foreach(var weapon in player.PlayerPawn.Value.WeaponServices.MyWeapons)
+        {
+            if (weapon is not { IsValid: true, Value.IsValid: true }) 
+                continue;
+            if (weapon.Value.DesignerName != designerName) 
+                continue;
+
+            item = weapon;
+        }
+            
+        if (item != null && item.Value != null)
+        {
+            player.PlayerPawn.Value.RemovePlayerItem(item.Value);
+            item.Value.Remove();
+            return true;
+        }
+            
+        return false;
+    }
+    
     public static void RemoveAllItemsAndEntities(CCSPlayerController player)
     {
         if (player.PlayerPawn.Value == null || player.PlayerPawn.Value.WeaponServices == null)
@@ -116,5 +141,31 @@ public class Helpers
         }
 
         return numTerrorists;
+    }
+    
+    public static CCSPlayerController? GetBombCarrier()
+    {
+        foreach (var player in Utilities.GetPlayers().Where(IsValidPlayer))
+        {
+            CHandle<CBasePlayerWeapon>? item = null;
+            if (player.PlayerPawn.Value == null || player.PlayerPawn.Value.WeaponServices == null) return null;
+
+            foreach (var weapon in player.PlayerPawn.Value.WeaponServices.MyWeapons)
+            {
+                if (weapon is not { IsValid: true, Value.IsValid: true })
+                    continue;
+                if (weapon.Value.DesignerName != "weapon_c4")
+                    continue;
+
+                item = weapon;
+            }
+
+            if (item != null && item.Value != null)
+            {
+                return player;
+            }
+        }
+
+        return null;
     }
 }
