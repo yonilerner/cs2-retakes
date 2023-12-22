@@ -354,6 +354,7 @@ public class RetakesPlugin : BasePlugin
 
         Console.WriteLine($"{MessagePrefix}Planting c4...");
         CreatePlantedC4(pBombCarrierController);
+        Console.WriteLine($"{MessagePrefix}Planting c4 DONE");
 
         return HookResult.Continue;
     }
@@ -533,43 +534,58 @@ public class RetakesPlugin : BasePlugin
             return false;
         }
         
+        Console.WriteLine($"{MessagePrefix}removing bomb");
+        Helpers.RemoveItemByDesignerName(bombCarrier, "weapon_c4");
+        
         playerOrigin.Z -= bombCarrier.PlayerPawn.Value.Collision.Mins.Z;
-
-        Console.WriteLine($"{MessagePrefix}spawning prop");
-        prop.DispatchSpawn();
-
+        
+        Console.WriteLine($"{MessagePrefix}casting prop to CPlantedC4");
         var plantedC4 = new CPlantedC4(prop.Handle);
-
-        Server.NextFrame(() =>
+        
+        Console.WriteLine($"{MessagePrefix}setting planted c4 props");
+        plantedC4.BombTicking = true;
+        plantedC4.CannotBeDefused = false;
+        plantedC4.BeingDefused = false;
+        
+        Console.WriteLine($"{MessagePrefix}calling dispatch spawn");
+        plantedC4.DispatchSpawn();
+        
+        Console.WriteLine($"{MessagePrefix}complete! waiting for timer");
+        
+        // Server.NextFrame(() =>
+        // {
+        AddTimer(0.05f, () =>
         {
-            Server.NextFrame(() => {
-                Console.WriteLine($"{MessagePrefix}teleporting prop");
-                prop.Teleport(playerOrigin, new QAngle(IntPtr.Zero, IntPtr.Zero, IntPtr.Zero), new Vector(0, 0, 0));
+            Console.WriteLine($"{MessagePrefix}teleporting prop");
+            prop.Teleport(playerOrigin, new QAngle(IntPtr.Zero, IntPtr.Zero, IntPtr.Zero), new Vector(0, 0, 0));
 
-                Console.WriteLine($"{MessagePrefix}setting planted c4 props");
-                // This works but it's not the best way to do it(questionable decision)
-                plantedC4.BombTicking = true;
-                // plantedC4.BombSite = (int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value;
-                // plantedC4.CannotBeDefused = false;
-                // plantedC4.BeingDefused = false;
-                
-                Console.WriteLine($"{MessagePrefix}getting bombtarget - {(int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value}");
-                var bombTarget = Utilities.GetEntityFromIndex<CBombTarget>((int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value);
-                Console.WriteLine($"{MessagePrefix}got bomb target, setting bombplantedhere");
-                bombTarget.BombPlantedHere = true;
+            Console.WriteLine(
+                $"{MessagePrefix}getting bombtargets");
+            var bombTargets =
+                Utilities.FindAllEntitiesByDesignerName<CBombTarget>("func_bomb_target").ToList();
 
-                Console.WriteLine($"{MessagePrefix}sending bomb planted event");
-                SendBombPlantedEvent(bombCarrier);
-                
-                // set game rules
-                Console.WriteLine($"{MessagePrefix}setting game rules");
-                gameRules.BombDropped = false;
-                gameRules.BombPlanted = true;
-                
-                Console.WriteLine($"{MessagePrefix}removing bomb");
-                Helpers.RemoveItemByDesignerName(bombCarrier, "weapon_c4");
-            });
+            if (bombTargets.Any())
+            {
+                Console.WriteLine($"{MessagePrefix}got bomb targets, setting bombplantedhere");
+
+                bombTargets.Where(bombTarget => bombTarget.IsBombSiteB == (_currentBombsite == Bombsite.B))
+                    .ToList()
+                    .ForEach(bombTarget =>
+                    {
+                        bombTarget.BombPlantedHere = true;
+                    });
+            }
+
+            Console.WriteLine($"{MessagePrefix}sending bomb planted event");
+            SendBombPlantedEvent(bombCarrier);
+
+            // set game rules
+            Console.WriteLine($"{MessagePrefix}setting game rules");
+            gameRules.BombDropped = false;
+            gameRules.BombPlanted = true;
         });
+            
+        // });
 
         return true;
     }
@@ -584,10 +600,10 @@ public class RetakesPlugin : BasePlugin
         var bombPlantedEvent = NativeAPI.CreateEvent("bomb_planted", true);
         NativeAPI.SetEventPlayerController(bombPlantedEvent, "userid", bombCarrier.Handle);
         NativeAPI.SetEventInt(bombPlantedEvent, "userid", (int)bombCarrier.PlayerPawn.Value.Index);
-        NativeAPI.SetEventInt(bombPlantedEvent, "posx", (int)bombCarrier.PlayerPawn.Value.AbsOrigin!.X);
-        NativeAPI.SetEventInt(bombPlantedEvent, "posy", (int)bombCarrier.PlayerPawn.Value.AbsOrigin!.Y);
-        NativeAPI.SetEventInt(bombPlantedEvent, "site", (int)bombCarrier.PlayerPawn.Value.BombSiteIndex.Value);
-        NativeAPI.SetEventInt(bombPlantedEvent, "priority", 5);
+        // NativeAPI.SetEventInt(bombPlantedEvent, "posx", (int)bombCarrier.PlayerPawn.Value.AbsOrigin!.X);
+        // NativeAPI.SetEventInt(bombPlantedEvent, "posy", (int)bombCarrier.PlayerPawn.Value.AbsOrigin!.Y);
+        // NativeAPI.SetEventInt(bombPlantedEvent, "site", 0);
+        // NativeAPI.SetEventInt(bombPlantedEvent, "priority", 5);
 
         NativeAPI.FireEvent(bombPlantedEvent, false);
     }
