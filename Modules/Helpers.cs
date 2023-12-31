@@ -1,4 +1,5 @@
-﻿using CounterStrikeSharp.API;
+﻿using System.Reflection;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 
@@ -167,5 +168,25 @@ public class Helpers
         }
 
         return null;
+    }
+    
+    public static void DebugObject(string prefix, object myObject)
+    {
+        var myType = myObject.GetType();
+        var props = new List<PropertyInfo>(myType.GetProperties());
+
+        foreach (var prop in props)
+        {
+            try
+            {
+                var propValue = prop.GetValue(myObject, null);
+
+                Console.WriteLine($"{prefix}.{prop.Name} = {propValue ?? "null"}");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"{prefix}.{prop.Name} = exception");
+            }
+        }
     }
 }

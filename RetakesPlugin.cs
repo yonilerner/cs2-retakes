@@ -451,6 +451,15 @@ public class RetakesPlugin : BasePlugin
     {
         Console.WriteLine($"{MessagePrefix}OnBombPlanted event fired");
 
+        // If we don't have the game rules, get them.
+        _gameRules = Helpers.GetGameRules();
+        
+        if (_gameRules == null)
+        {
+            Console.WriteLine($"{MessagePrefix}Game rules not found.");
+            return HookResult.Continue;
+        }
+        
         // Get planted c4
         var plantedC4 = Utilities.FindAllEntitiesByDesignerName<CPlantedC4>("planted_c4").FirstOrDefault();
         
@@ -460,16 +469,22 @@ public class RetakesPlugin : BasePlugin
             return HookResult.Continue;
         }
         
-        Type myType = plantedC4.GetType();
-        IList<PropertyInfo> props = new List<PropertyInfo>(myType.GetProperties());
-
-        foreach (PropertyInfo prop in props)
-        {
-            object? propValue = prop.GetValue(plantedC4, null);
-
-            // Do something with propValue
-            Console.WriteLine("plantedC4." + prop.Name + " = " + propValue);
-        }
+        // set game rules
+        Console.WriteLine($"{MessagePrefix}setting game rules");
+        _gameRules.BombDropped = false;
+        _gameRules.BombPlanted = true;
+        _gameRules.BombDefused = false;
+        _gameRules.RetakeRules.BlockersPresent = false;
+        _gameRules.RetakeRules.RoundInProgress = true;
+        _gameRules.RetakeRules.BombSite = plantedC4.BombSite;
+        
+        // Debug planted c4
+        Console.WriteLine("");
+        Console.WriteLine("Planted C4 Props...");
+        Helpers.DebugObject("planted_c4", plantedC4);
+        Console.WriteLine("");
+        Console.WriteLine("Game Rules Props...");
+        Helpers.DebugObject("_gameRules", _gameRules);
         
         return HookResult.Continue;
     }
@@ -562,7 +577,7 @@ public class RetakesPlugin : BasePlugin
         
         var plantedC4 = Utilities.CreateEntityByName<CPlantedC4>("planted_c4");
 
-        if (plantedC4 == null) 
+        if (plantedC4 == null)
         {
             Console.WriteLine($"{MessagePrefix}return false 2");
             return false;
@@ -613,14 +628,6 @@ public class RetakesPlugin : BasePlugin
 
             Console.WriteLine($"{MessagePrefix}sending bomb planted event");
             SendBombPlantedEvent(bombCarrier, plantedC4);
-
-            // set game rules
-            Console.WriteLine($"{MessagePrefix}setting game rules");
-            gameRules.BombDropped = false;
-            gameRules.BombPlanted = true;
-            gameRules.RetakeRules.BlockersPresent = false;
-            gameRules.RetakeRules.RoundInProgress = true;
-            gameRules.RetakeRules.BombSite = plantedC4.BombSite;
 
             Console.WriteLine($"{MessagePrefix}setting ct playerPawn properties");
             foreach (var player in Utilities.GetPlayers().Where(player => player.TeamNum == (int)CsTeam.CounterTerrorist))
