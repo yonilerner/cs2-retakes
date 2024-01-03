@@ -605,12 +605,11 @@ public class RetakesPlugin : BasePlugin
         plantedC4.BeingDefused = false;
         plantedC4.SourceSoundscapeHash = 2005810340;
         
-        // TODO: Figure out why this crashes the server.
-        // if (_planter != null)
-        // {
-        //     Console.WriteLine($"{MessagePrefix}Setting CPlantedC4 m_hOwnerEntity");
-        //     Schema.SetSchemaValue(plantedC4.Handle, "CPlantedC4", "m_hOwnerEntity", _planter.Index);
-        // }
+        if (_planter != null)
+        {
+            Console.WriteLine($"{MessagePrefix}Setting CPlantedC4 m_hOwnerEntity");
+            Schema.SetSchemaValue(plantedC4.Handle, "CBaseEntity", "m_hOwnerEntity", _planter.Index);
+        }
 
         Console.WriteLine($"{MessagePrefix}calling dispatch spawn");
         plantedC4.DispatchSpawn();
