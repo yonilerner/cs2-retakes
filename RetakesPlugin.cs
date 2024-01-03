@@ -640,7 +640,12 @@ public class RetakesPlugin : BasePlugin
             }
 
             Console.WriteLine($"{MessagePrefix}sending bomb planted event");
+            Console.WriteLine($"{MessagePrefix} c4blow before: {plantedC4.C4Blow}");
             SendBombPlantedEvent(bombCarrier, plantedC4);
+            Console.WriteLine($"{MessagePrefix} c4blow after: {plantedC4.C4Blow}");
+            
+            Console.WriteLine($"{MessagePrefix}forcing c4 blow to crazy number");
+            plantedC4.C4Blow = Server.CurrentTime * 2;
 
             Console.WriteLine($"{MessagePrefix}setting ct playerPawn properties");
             foreach (var player in Utilities.GetPlayers().Where(player => player.TeamNum == (int)CsTeam.CounterTerrorist))
