@@ -5,6 +5,7 @@ using CounterStrikeSharp.API.Core.Attributes;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Utils;
 using RetakesPlugin.Modules;
 using RetakesPlugin.Modules.Allocators;
@@ -469,6 +470,8 @@ public class RetakesPlugin : BasePlugin
             return HookResult.Continue;
         }
         
+        plantedC4.C4Blow = Server.CurrentTime + 40.0f;
+        
         // set game rules
         Console.WriteLine($"{MessagePrefix}setting game rules");
         _gameRules.BombDropped = false;
@@ -479,12 +482,15 @@ public class RetakesPlugin : BasePlugin
         _gameRules.RetakeRules.BombSite = plantedC4.BombSite;
         
         // Debug planted c4
+        List<string> c4NestedProps = new() { "" };
         Console.WriteLine("");
         Console.WriteLine("Planted C4 Props...");
-        Helpers.DebugObject("planted_c4", plantedC4);
+        Helpers.DebugObject("planted_c4", plantedC4, c4NestedProps);
+        
+        List<string> gameRulesNestedProps = new() { "RetakeRules" };
         Console.WriteLine("");
         Console.WriteLine("Game Rules Props...");
-        Helpers.DebugObject("_gameRules", _gameRules);
+        Helpers.DebugObject("_gameRules", _gameRules, gameRulesNestedProps);
         
         return HookResult.Continue;
     }
@@ -558,7 +564,7 @@ public class RetakesPlugin : BasePlugin
 
         return HookResult.Continue;
     }
-
+    
     // Autoplant helpers (credit zwolof)
     private bool CreatePlantedC4(CCSPlayerController bombCarrier)
     {
@@ -599,6 +605,13 @@ public class RetakesPlugin : BasePlugin
         plantedC4.BeingDefused = false;
         plantedC4.SourceSoundscapeHash = 2005810340;
         
+        // TODO: Figure out why this crashes the server.
+        // if (_planter != null)
+        // {
+        //     Console.WriteLine($"{MessagePrefix}Setting CPlantedC4 m_hOwnerEntity");
+        //     Schema.SetSchemaValue(plantedC4.Handle, "CPlantedC4", "m_hOwnerEntity", _planter.Index);
+        // }
+
         Console.WriteLine($"{MessagePrefix}calling dispatch spawn");
         plantedC4.DispatchSpawn();
         
@@ -622,6 +635,7 @@ public class RetakesPlugin : BasePlugin
                     .ToList()
                     .ForEach(bombTarget =>
                     {
+                        Console.WriteLine($"{MessagePrefix}actually setting BombPlantedHere for {bombTarget.DesignerName}");
                         bombTarget.BombPlantedHere = true;
                     });
             }
@@ -641,6 +655,7 @@ public class RetakesPlugin : BasePlugin
                 player.PlayerPawn.Value.RetakesHasDefuseKit = true;
                 player.PlayerPawn.Value.IsDefusing = false;
                 player.PlayerPawn.Value.LastGivenDefuserTime = 0.0f;
+                player.PlayerPawn.Value.InNoDefuseArea = false;
             }
         });
 

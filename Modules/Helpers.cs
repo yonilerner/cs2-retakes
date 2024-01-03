@@ -170,7 +170,7 @@ public class Helpers
         return null;
     }
     
-    public static void DebugObject(string prefix, object myObject)
+    public static void DebugObject(string prefix, object myObject, List<string> nestedObjects)
     {
         var myType = myObject.GetType();
         var props = new List<PropertyInfo>(myType.GetProperties());
@@ -179,11 +179,25 @@ public class Helpers
         {
             try
             {
-                var propValue = prop.GetValue(myObject, null);
+                object? propValue;
+                
+                if (nestedObjects.Contains(prop.Name))
+                {
+                    propValue = prop.GetValue(myObject, null);
+                    
+                    if (propValue != null)
+                    {
+                        DebugObject($"{prefix}.{prop.Name}", propValue, nestedObjects);
+                    }
+                    
+                    continue;
+                }
+                
+                propValue = prop.GetValue(myObject, null);
 
                 Console.WriteLine($"{prefix}.{prop.Name} = {propValue ?? "null"}");
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Console.WriteLine($"{prefix}.{prop.Name} = exception");
             }
